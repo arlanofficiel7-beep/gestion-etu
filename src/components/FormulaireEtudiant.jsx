@@ -23,16 +23,32 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
   }
 
   const envoyerEmail = async (etudiant) => {
+    // 📧 Email à toi
     await emailjs.send(
       EMAILJS_CONFIG.SERVICE_ID,
       EMAILJS_CONFIG.TEMPLATE_ID,
       {
-        prenom:      etudiant.prenom,
-        nom:         etudiant.nom,
-        filiere:     etudiant.filiere,
-        note:        etudiant.note,
-        statut:      etudiant.statut,
+        prenom:       etudiant.prenom,
+        nom:          etudiant.nom,
+        filiere:      etudiant.filiere,
+        note:         etudiant.note,
+        statut:       etudiant.statut,
         destinataire: EMAILJS_CONFIG.DESTINATAIRE,
+      },
+      EMAILJS_CONFIG.PUBLIC_KEY
+    )
+
+    // 📧 Email au prof
+    await emailjs.send(
+      EMAILJS_CONFIG.SERVICE_ID,
+      EMAILJS_CONFIG.TEMPLATE_ID2,
+      {
+        prenom:       etudiant.prenom,
+        nom:          etudiant.nom,
+        filiere:      etudiant.filiere,
+        note:         etudiant.note,
+        statut:       etudiant.statut,
+        destinataire: EMAILJS_CONFIG.DESTINATAIRE2,
       },
       EMAILJS_CONFIG.PUBLIC_KEY
     )
@@ -59,7 +75,7 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
         await onModifier(etudiant)
       } else {
         await onAjouter(etudiant)
-        await envoyerEmail(etudiant) // 📧 Email seulement à l'ajout
+        await envoyerEmail(etudiant) // 📧 Emails seulement à l'ajout
       }
 
       setSucces(true)
@@ -92,7 +108,7 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
       {erreur && <p className="msg-erreur">{erreur}</p>}
       {succes && (
         <p className="msg-succes">
-          {etudiantAModifier ? '✅ Étudiant modifié !' : '✅ Étudiant ajouté et email envoyé !'} Redirection...
+          {etudiantAModifier ? '✅ Étudiant modifié !' : '✅ Étudiant ajouté et emails envoyés !'} Redirection...
         </p>
       )}
 

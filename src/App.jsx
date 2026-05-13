@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { db } from './firebase'
 import Navbar from './components/Navbar'
 import Dashboard from './components/Dashboard'
 import ListeEtudiants from './components/ListeEtudiants'
@@ -7,14 +9,6 @@ import Stats from './components/Stats'
 import GestionFilieres from './components/GestionFilieres'
 import './App.css'
 
-const DATA_INITIALE = [
-  { id: 1, nom: 'Obame', prenom: 'Jean', filiere: 'Informatique', note: 16, statut: 'Admis' },
-  { id: 2, nom: 'Nguema', prenom: 'Marie', filiere: 'Gestion', note: 12, statut: 'Admis' },
-  { id: 3, nom: 'Mba', prenom: 'Paul', filiere: 'Droit', note: 8, statut: 'Ajourné' },
-  { id: 4, nom: 'Ella', prenom: 'Sophie', filiere: 'Informatique', note: 18, statut: 'Admis' },
-  { id: 5, nom: 'Nze', prenom: 'Thomas', filiere: 'Médecine', note: 14, statut: 'Admis' },
-]
-
 const FILIERES_INITIALES = ['Informatique', 'Gestion', 'Droit', 'Médecine', 'Lettres']
 
 function App() {
@@ -22,18 +16,29 @@ function App() {
   const [etudiants, setEtudiants] = useState([])
   const [filieres, setFilieres] = useState(FILIERES_INITIALES)
   const [loading, setLoading] = useState(true)
-  const [pageLoading, setPageLoading] = useState(false) // 👈 NOUVEAU
+  const [pageLoading, setPageLoading] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [etudiantAModifier, setEtudiantAModifier] = useState(null)
 
+  // 🔥 Écoute en temps réel la collection "etudiants" dans Firestore
   useEffect(() => {
-    setTimeout(() => {
-      setEtudiants(DATA_INITIALE)
+    const unsub = onSnapshot(collection(db, 'etudiants'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      setEtudiants(data)
       setLoading(false)
-    }, 1200)
+    })
+    return () => unsub() // nettoyage à la destruction du composant
   }, [])
 
-  // 👇 NOUVEAU : changer de page avec un loader
+  // 🔥 Écoute en temps réel la collection "filieres" dans Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'filieres'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, nom: doc.data().nom }))
+      setFilieres(data)
+    })
+    return () => unsub()
+  }, [])
+
   const changerPage = (nouvellePage) => {
     setPageLoading(true)
     setTimeout(() => {
@@ -42,47 +47,43 @@ function App() {
     }, 600)
   }
 
-  const ajouterEtudiant = (etudiant) => {
-    const nouvel = { ...etudiant, id: Date.now() }
-    setEtudiants(prev => [...prev, nouvel])
+  // 🔥 Ajouter dans Firestore
+  const ajouterEtudiant = async (etudiant) => {
+    await addDoc(collection(db, 'etudiants'), etudiant)
   }
 
-  const supprimerEtudiant = (id) => {
-    setEtudiants(prev => prev.filter(e => e.id !== id))
+  // 🔥 Supprimer dans Firestore
+  const supprimerEtudiant = async (id) => {
+    await deleteDoc(doc(db, 'etudiants', id))
   }
 
-  const modifierEtudiant = (etudiantModifie) => {
-    setEtudiants(prev =>
-      prev.map(e => e.id === etudiantModifie.id ? etudiantModifie : e)
-    )
+  // 🔥 Modifier dans Firestore
+  const modifierEtudiant = async (etudiantModifie) => {
+    const { id, ...data } = etudiantModifie
+    await updateDoc(doc(db, 'etudiants', id), data)
     setEtudiantAModifier(null)
   }
 
   const ouvrirModification = (etudiant) => {
     setEtudiantAModifier(etudiant)
-    changerPage('ajouter') // 👈 utilise changerPage
+    changerPage('ajouter')
   }
 
-  const ajouterFiliere = (nom) => {
-    if (!filieres.includes(nom)) setFilieres(prev => [...prev, nom])
+  // 🔥 Filières dans Firestore
+  const ajouterFiliere = async (nom) => {
+    const existe = filieres.find(f => f.nom === nom)
+    if (!existe) await addDoc(collection(db, 'filieres'), { nom })
   }
 
-  const supprimerFiliere = (nom) => {
-    setFilieres(prev => prev.filter(f => f !== nom))
-    setEtudiants(prev =>
-      prev.map(e => e.filiere === nom ? { ...e, filiere: '—' } : e)
-    )
+  const supprimerFiliere = async (filiere) => {
+    await deleteDoc(doc(db, 'filieres', filiere.id))
   }
 
-  const modifierFiliere = (ancien, nouveau) => {
-    setFilieres(prev => prev.map(f => f === ancien ? nouveau : f))
-    setEtudiants(prev =>
-      prev.map(e => e.filiere === ancien ? { ...e, filiere: nouveau } : e)
-    )
+  const modifierFiliere = async (filiere, nouveauNom) => {
+    await updateDoc(doc(db, 'filieres', filiere.id), { nom: nouveauNom })
   }
 
   const renderPage = () => {
-    
     if (loading || pageLoading) return (
       <div className="loader-container">
         <div className="loader-spinner"></div>
@@ -106,7 +107,7 @@ function App() {
           etudiantAModifier={etudiantAModifier}
           setEtudiantAModifier={setEtudiantAModifier}
           filieres={filieres}
-          setPage={changerPage} // 👈 utilise changerPage
+          setPage={changerPage}
         />
       )
       case 'filieres':  return (
@@ -124,12 +125,7 @@ function App() {
 
   return (
     <div className={`app ${darkMode ? 'dark' : ''}`}>
-      <Navbar
-        page={page}
-        setPage={changerPage} // 👈 utilise changerPage
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-      />
+      <Navbar page={page} setPage={changerPage} darkMode={darkMode} setDarkMode={setDarkMode} />
       <main className="main">{renderPage()}</main>
       <footer className="footer">© 2025 GestionEtu — Application React</footer>
     </div>

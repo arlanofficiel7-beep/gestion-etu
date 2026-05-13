@@ -6,39 +6,38 @@ function GestionFilieres({ filieres, onAjouter, onSupprimer, onModifier }) {
   const [filiereEnEdition, setFiliereEnEdition] = useState(null)
   const [valeurEdition, setValeurEdition] = useState('')
 
-  const handleAjouter = () => {
+  const handleAjouter = async () => {
     if (!nouvelle.trim()) {
       setErreur('⚠️ Le nom ne peut pas être vide.')
       return
     }
-    if (filieres.includes(nouvelle.trim())) {
+    if (filieres.find(f => f.nom === nouvelle.trim())) {
       setErreur('⚠️ Cette filière existe déjà.')
       return
     }
-    onAjouter(nouvelle.trim())
+    await onAjouter(nouvelle.trim())
     setNouvelle('')
     setErreur('')
   }
 
-  const handleModifier = (ancien) => {
-    if (!valeurEdition.trim()) return
-    if (valeurEdition.trim() === ancien) {
+  const handleModifier = async (filiere) => {
+    if (!valeurEdition.trim() || valeurEdition.trim() === filiere.nom) {
       setFiliereEnEdition(null)
       return
     }
-    if (filieres.includes(valeurEdition.trim())) {
+    if (filieres.find(f => f.nom === valeurEdition.trim())) {
       setErreur('⚠️ Cette filière existe déjà.')
       return
     }
-    onModifier(ancien, valeurEdition.trim())
+    await onModifier(filiere, valeurEdition.trim())
     setFiliereEnEdition(null)
     setValeurEdition('')
     setErreur('')
   }
 
   const ouvrirEdition = (filiere) => {
-    setFiliereEnEdition(filiere)
-    setValeurEdition(filiere)
+    setFiliereEnEdition(filiere.id)
+    setValeurEdition(filiere.nom)
     setErreur('')
   }
 
@@ -46,7 +45,6 @@ function GestionFilieres({ filieres, onAjouter, onSupprimer, onModifier }) {
     <div className="page">
       <h2 className="page-titre">🗂️ Gestion des filières</h2>
 
-      {/* Formulaire d'ajout */}
       <div className="filiere-form">
         <h3>Ajouter une filière</h3>
         {erreur && <p className="msg-erreur">{erreur}</p>}
@@ -64,16 +62,14 @@ function GestionFilieres({ filieres, onAjouter, onSupprimer, onModifier }) {
         </div>
       </div>
 
-      {/* Liste des filières */}
       <div className="filiere-liste">
         <h3>Filières existantes ({filieres.length})</h3>
         {filieres.length === 0 ? (
           <p className="vide">Aucune filière enregistrée.</p>
         ) : (
           filieres.map(f => (
-            <div key={f} className="filiere-item">
-              {filiereEnEdition === f ? (
-                // Mode édition
+            <div key={f.id} className="filiere-item">
+              {filiereEnEdition === f.id ? (
                 <div className="filiere-edit-row">
                   <input
                     className="recherche"
@@ -90,9 +86,8 @@ function GestionFilieres({ filieres, onAjouter, onSupprimer, onModifier }) {
                   </button>
                 </div>
               ) : (
-                // Mode affichage
                 <div className="filiere-affichage">
-                  <span className="filiere-nom">🎓 {f}</span>
+                  <span className="filiere-nom">🎓 {f.nom}</span>
                   <div className="filiere-actions">
                     <button className="btn-modifier" onClick={() => ouvrirEdition(f)}>
                       ✏️ Modifier

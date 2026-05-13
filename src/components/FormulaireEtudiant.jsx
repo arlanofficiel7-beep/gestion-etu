@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import emailjs from '@emailjs/browser'
+import { EMAILJS_CONFIG } from '../emailjs'
 
 function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudiantAModifier, filieres, setPage }) {
   const [form, setForm] = useState({
@@ -6,8 +8,8 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
   })
   const [erreur, setErreur] = useState('')
   const [succes, setSucces] = useState(false)
+  const [envoi, setEnvoi] = useState(false)
 
-  // Si on est en mode modification, on pré-remplit le formulaire
   useEffect(() => {
     if (etudiantAModifier) {
       setForm(etudiantAModifier)
@@ -20,7 +22,23 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  const handleSubmit = (e) => {
+  const envoyerEmail = async (etudiant) => {
+    await emailjs.send(
+      EMAILJS_CONFIG.SERVICE_ID,
+      EMAILJS_CONFIG.TEMPLATE_ID,
+      {
+        prenom:      etudiant.prenom,
+        nom:         etudiant.nom,
+        filiere:     etudiant.filiere,
+        note:        etudiant.note,
+        statut:      etudiant.statut,
+        destinataire: EMAILJS_CONFIG.DESTINATAIRE,
+      },
+      EMAILJS_CONFIG.PUBLIC_KEY
+    )
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.nom || !form.prenom || !form.filiere || !form.note) {
       setErreur('⚠️ Veuillez remplir tous les champs.')
@@ -31,20 +49,32 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
       return
     }
 
-    if (etudiantAModifier) {
-      onModifier({ ...form, note: Number(form.note) })
-    } else {
-      onAjouter({ ...form, note: Number(form.note) })
-    }
-
-    setSucces(true)
+    setEnvoi(true)
     setErreur('')
-    setForm({ nom: '', prenom: '', filiere: '', note: '', statut: 'Admis' })
-    setTimeout(() => {
-      setSucces(false)
-      setEtudiantAModifier(null)
-      setPage('liste')
-    }, 1500)
+
+    try {
+      const etudiant = { ...form, note: Number(form.note) }
+
+      if (etudiantAModifier) {
+        await onModifier(etudiant)
+      } else {
+        await onAjouter(etudiant)
+        await envoyerEmail(etudiant) // 📧 Email seulement à l'ajout
+      }
+
+      setSucces(true)
+      setForm({ nom: '', prenom: '', filiere: '', note: '', statut: 'Admis' })
+      setTimeout(() => {
+        setSucces(false)
+        setEtudiantAModifier(null)
+        setPage('liste')
+      }, 1500)
+
+    } catch (err) {
+      setErreur('❌ Une erreur est survenue. Réessayez.')
+    } finally {
+      setEnvoi(false)
+    }
   }
 
   const annulerModification = () => {
@@ -62,7 +92,7 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
       {erreur && <p className="msg-erreur">{erreur}</p>}
       {succes && (
         <p className="msg-succes">
-          {etudiantAModifier ? '✅ Étudiant modifié !' : '✅ Étudiant ajouté !'} Redirection...
+          {etudiantAModifier ? '✅ Étudiant modifié !' : '✅ Étudiant ajouté et email envoyé !'} Redirection...
         </p>
       )}
 
@@ -84,7 +114,7 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
             <select name="filiere" value={form.filiere} onChange={handleChange}>
               <option value="">-- Choisir --</option>
               {filieres.map(f => (
-                <option key={f} value={f}>{f}</option>
+                <option key={f.id} value={f.nom}>{f.nom}</option>
               ))}
             </select>
           </div>
@@ -103,8 +133,8 @@ function FormulaireEtudiant({ onAjouter, onModifier, etudiantAModifier, setEtudi
         </div>
 
         <div className="form-btns">
-          <button type="submit" className="btn-submit">
-            {etudiantAModifier ? '💾 Enregistrer les modifications' : '➕ Ajouter l\'étudiant'}
+          <button type="submit" className="btn-submit" disabled={envoi}>
+            {envoi ? '⏳ En cours...' : etudiantAModifier ? '💾 Enregistrer' : '➕ Ajouter'}
           </button>
           {etudiantAModifier && (
             <button type="button" className="btn-annuler" onClick={annulerModification}>
